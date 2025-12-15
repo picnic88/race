@@ -208,32 +208,34 @@ int main() {
             mg_go_time != 0 &&
             GetTickCount() > mg_end_time)
         {
-            // 승자 결정 (동점 체크)
             int best = -1;
-            DWORD best_time = 0;
+            int best_score = -1;
             int tie = 0;
 
             for (int k = 0; k < mg_count; k++) {
                 int pid = mg_players[k];
-                DWORD t = mg_reaction[pid];
+                int score = mg_score[pid];
 
-                if (best == -1 || t < best_time) {
+                if (score > best_score) {
+                    best_score = score;
                     best = pid;
-                    best_time = t;
                     tie = 0;
                 }
-                else if (t == best_time) {
+                else if (score == best_score) {
                     tie = 1;
                 }
             }
 
-            if (tie) {
+            // ===== 결과 결정 =====
+            if (tie || best_score <= 0) {
                 mg_winner = -1;   // 무승부
             }
             else {
-                mg_winner = best; // 단독 승자
+                mg_winner = best;
             }
+
             mg_active = 0;
+
 
             // 결과 패킷
             for (int k = 0; k < mg_count; k++) {

@@ -201,115 +201,80 @@ int main() {
             }
         }
 
-        // ===== 연타 미니게임 타임아웃 처리 =====
+        // ===== 연타 종료 처리 =====
         if (state == ST_MINIGAME &&
             mg_active &&
             mg_type == MG_MASH &&
             mg_go_time != 0 &&
             GetTickCount() > mg_end_time)
         {
+            // 승자 결정 (동점 체크)
             int best = -1;
-            int best_score = -1;
+            DWORD best_time = 0;
             int tie = 0;
 
             for (int k = 0; k < mg_count; k++) {
                 int pid = mg_players[k];
-                int score = mg_score[pid];
+                DWORD t = mg_reaction[pid];
 
-                if (score > best_score) {
-                    best_score = score;
+                if (best == -1 || t < best_time) {
                     best = pid;
+                    best_time = t;
                     tie = 0;
                 }
-                else if (score == best_score) {
-                    tie = 1;   // 동점 발생
+                else if (t == best_time) {
+                    tie = 1;
                 }
             }
 
-            // ===== 동점이면 무효 =====
-            if (tie || best_score <= 0) {
-
-                mg_active = 0;
-                mg_winner = -1;
-
-                // 결과 패킷 (무효)
-                for (int k = 0; k < mg_count; k++) {
-                    int pid = mg_players[k];
-
-                    GamePacket r = { 0 };
-                    r.type = PKT_MINIGAME_RESULT;
-                    r.player_id = -1;          // 승자 없음
-                    r.value = mg_score[pid];
-                    strcpy(r.message, "SYS:MASH_DRAW");
-
-                    send(clients[pid], (char*)&r, sizeof(r), 0);
-                }
-
-                // 이동 없음 / 보상 없음
+            if (tie) {
+                mg_winner = -1;   // 무승부
             }
             else {
-                // ===== 단독 승자 =====
-                mg_winner = best;
-
-                for (int k = 0; k < mg_count; k++) {
-                    int pid = mg_players[k];
-
-                    GamePacket r = { 0 };
-                    r.type = PKT_MINIGAME_RESULT;
-                    r.player_id = mg_winner;
-                    r.value = mg_score[pid];
-                    strcpy(r.message,
-                        pid == mg_winner
-                        ? "SYS:MASH_WON"
-                        : "SYS:MASH_LOST");
-
-                    send(clients[pid], (char*)&r, sizeof(r), 0);
-                }
-
-                // 보상
-                positions[mg_winner] += 2;
-                BroadcastUpdate(clients, positions, map_size);
+                mg_winner = best; // 단독 승자
             }
-
-            // 다음 턴
-            state = ST_GAME;
-            turn_idx = (turn_idx + 1) % MAX_PLAYERS;
-            int next = turn_order[turn_idx];
-            SendTurnPacket(clients, next, positions, map_size, turn_order);
-            for (int j = 0; j < MAX_PLAYERS; j++)
-                if (j != next)
-                    SendWaitPacket(clients, j, next, positions, map_size, turn_order);
-
             mg_active = 0;
 
-            // 결과 전송
+            // 결과 패킷
             for (int k = 0; k < mg_count; k++) {
                 int pid = mg_players[k];
 
                 GamePacket r = { 0 };
                 r.type = PKT_MINIGAME_RESULT;
                 r.player_id = mg_winner;
-                r.value = mg_score[pid];
-                strcpy(r.message,
-                    pid == mg_winner
-                    ? "SYS:MASH_WON"
-                    : "SYS:MASH_LOST");
+                r.value = mg_reaction[pid];
+
+                if (mg_winner == -1) {
+                    strcpy(r.message, "SYS:MASH_DRAW");
+                }
+                else {
+                    strcpy(r.message, pid == mg_winner ? "SYS:MASH_WON" : "SYS:MASH_LOST");
+                }
 
                 send(clients[pid], (char*)&r, sizeof(r), 0);
             }
 
-            // 보상
-            positions[mg_winner] += 2;
-            BroadcastUpdate(clients, positions, map_size);
+            // 보상 (무승부면 없음)
+            if (mg_winner != -1) {
+                positions[mg_winner] += 2;
+                BroadcastUpdate(clients, positions, map_size);
+            }
 
             // 다음 턴
+            mg_active = 0;
+            mg_go_time = 0;
+            mg_end_time = 0;
+            mg_type = -1;
+
             state = ST_GAME;
             turn_idx = (turn_idx + 1) % MAX_PLAYERS;
+
             int next = turn_order[turn_idx];
             SendTurnPacket(clients, next, positions, map_size, turn_order);
             for (int j = 0; j < MAX_PLAYERS; j++)
                 if (j != next)
                     SendWaitPacket(clients, j, next, positions, map_size, turn_order);
+
         }
 
         // ---------- 접속 ----------

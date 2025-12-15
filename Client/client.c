@@ -576,7 +576,7 @@ int main() {
                     if (g_minigame_type == MG_MASH)
                         printf("GO 신호 후 SPACE를 연타하세요\n");
                     else
-                        printf("GO 신호에 맞춰 SPACE를 입력하세요\n");
+                        printf("잠시 후 GO 신호에 맞춰 SPACE를 입력하세요\n");
 
                     SetCol(COL_DEFAULT);
                 }
@@ -663,7 +663,12 @@ int main() {
             printf("=================================\n\n");
             SetCol(COL_DEFAULT);
 
-            if (pkt.player_id == g_my_id) {
+            if (pkt.player_id == -1) {
+                SetCol(COL_DIM);
+                printf(">>> DRAW <<<\n\n");
+                PrintSystemMessage(pkt.message);
+            }
+            else if (pkt.player_id == g_my_id) {
                 SetCol(COL_ACCENT);
                 printf(">>> YOU WON <<<\n\n");
                 PrintSystemMessage(pkt.message);
@@ -676,7 +681,8 @@ int main() {
             }
             else {
                 SetCol(COL_DIM);
-                printf("Winner : P%d (관전 중)\n", pkt.player_id + 1);
+                printf("Winner : P%d\n", pkt.player_id + 1);
+                printf("(관전 중)\n");
             }
 
             SetCol(COL_DEFAULT);

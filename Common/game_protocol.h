@@ -15,6 +15,10 @@
 #define BUFSIZE 1024        
 #define MAX_PLAYERS 4
 
+// 미니게임 종류
+#define MG_REACTION   1   // 반응속도 측정
+#define MG_MASH       2   // 연타
+
 typedef enum {
     PKT_WAIT,
     PKT_MAP_REQ,
@@ -24,7 +28,11 @@ typedef enum {
     PKT_YOUR_TURN,
     PKT_UPDATE,
     PKT_GAME_OVER,
-    PKT_ASSIGN_ID
+    PKT_ASSIGN_ID,
+    PKT_MINIGAME_START,
+    PKT_MINIGAME_INPUT,
+    PKT_MINIGAME_UPDATE,
+    PKT_MINIGAME_RESULT
 } PacketType;
 
 
@@ -37,6 +45,14 @@ typedef struct {
     char jokbo[50];
     int positions[MAX_PLAYERS];
     int turn_order[MAX_PLAYERS];
+
+    // 미니게임
+    int minigame_type;   // MG_REACTION / MG_MASH
+    int minigame_players[MAX_PLAYERS];
+    int minigame_count;
+    int minigame_phase; // 0=READY, 1=GO
+    int value;  // 결과용 (reaction ms or mash count)
+
     char message[256];
 } GamePacket;
 

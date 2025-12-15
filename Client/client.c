@@ -16,8 +16,21 @@ static int g_turn_order_shown = 0;
 static int g_showing_result = 0;
 static int g_game_started = 0;
 static int g_just_started = 0;
+static int g_in_minigame = 0;
+static int g_minigame_phase = 0;   // 0=READY, 1=GO
+static int g_minigame_count = 0;
+static int g_minigame_players[MAX_PLAYERS];
+static int g_minigame_type = 0;   // MG_REACTION / MG_MASH
+static DWORD g_mash_end_time = 0;
+static int g_mashing = 0;
 
 static void cls() { system("cls"); }
+
+typedef struct {    // 서버 메시지 매핑
+    const char* key;
+    WORD color;
+    const char* text;
+} SysMsg;
 
 // ---------------- 콘솔 색상 ----------------
 
@@ -35,6 +48,16 @@ enum {
 static void SetCol(WORD col) {
     SetConsoleTextAttribute(g_hConsole, col);
 }
+
+static SysMsg SYS_MSG_TABLE[] = {
+    { "SYS:ORDER_SYNC", COL_SYSTEM, "[ PROTOCOL SYNC ] 순서 동기화\nSPACE를 입력하여 진행" },
+    { "SYS:REACTION_EARLY", COL_WARN, "[ INPUT VIOLATION ]\n신호 이전 입력 감지\n0.4초 입력 차단" },
+    { "SYS:RACE_WON",   COL_ACCENT, "[ SYSTEM OVERRIDE ] 우선권 확보\nPROGRESS +2" },
+    { "SYS:RACE_LOST",  COL_WARN,   "[ LATENCY ERROR ] 반응 지연" },
+    { "SYS:MASH_WON",   COL_ACCENT, "[ SYSTEM OVERRIDE ] 우선권 확보\nPROGRESS +2" },
+    { "SYS:MASH_LOST",  COL_WARN,   "[ LATENCY ERROR ] 반응 지연" },
+    { "SYS:MASH_DRAW", COL_DIM, "[ SYSTEM NEUTRALIZED ]\n반응 동점\n효과 없음" },
+};
 
 // ---------------- UI ----------------
 
@@ -121,6 +144,30 @@ static void DrawFinalTurnOrder() {
     printf("\n");
 }
 
+// 미니게임 참가자인지 판별
+static int IsMinigameParticipant() {
+    for (int i = 0; i < g_minigame_count; i++)
+        if (g_minigame_players[i] == g_my_id)
+            return 1;
+    return 0;
+}
+
+static void PrintSystemMessage(const char* msg) {
+    for (int i = 0; i < _countof(SYS_MSG_TABLE); i++) {
+        if (strcmp(msg, SYS_MSG_TABLE[i].key) == 0) {
+            SetCol(SYS_MSG_TABLE[i].color);
+            printf("%s\n", SYS_MSG_TABLE[i].text);
+            SetCol(COL_DEFAULT);
+            return;
+        }
+    }
+
+    // fallback
+    SetCol(COL_DIM);
+    printf("%s\n", msg);
+    SetCol(COL_DEFAULT);
+}
+
 // ---------------- main ----------------
 
 int main() {
@@ -153,6 +200,22 @@ int main() {
     int last_positions[MAX_PLAYERS] = { 0 };
 
     while (1) {
+        // ===== 연타 미니게임 입력 처리 (recv와 병행) =====
+        if (g_mashing) {
+
+            if (GetTickCount() > g_mash_end_time) {
+                g_mashing = 0;
+            }
+            else if (_kbhit()) {
+                int ch = _getch();
+                if (ch == ' ' || ch == '\r') {
+                    GamePacket inp = { 0 };
+                    inp.type = PKT_MINIGAME_INPUT;
+                    send(sock, (char*)&inp, sizeof(inp), 0);
+                }
+            }
+        }
+
         GamePacket pkt;
         int ret = recv(sock, (char*)&pkt, sizeof(pkt), 0);
         if (ret <= 0) {
@@ -224,7 +287,7 @@ int main() {
 
             if (pkt.message[0] != '\0') {
                 // 서버가 보낸 메시지가 있으면 그것만 사용
-                printf("%s\n", pkt.message);
+                PrintSystemMessage(pkt.message);
             }
             else {
                 // 서버 메시지가 없을 때만 기본 문구 출력
@@ -278,7 +341,7 @@ int main() {
                 if (g_order_rolls[p] > 0)
                     printf("P%d : %d\n", p + 1, g_order_rolls[p]);
                 else
-                    printf("P%d : (재굴림 대상)\n", p + 1);
+                    printf("P%d : (동기화 대상)\n", p + 1);
             }
 
             printf("\n");
@@ -473,6 +536,161 @@ int main() {
 
             g_just_started = 0;
             break;
+
+            // ---------- 미니게임 ----------
+        case PKT_MINIGAME_START:
+        {
+            cls();
+            SetCol(COL_DEFAULT);
+            DrawBanner();
+
+            g_in_minigame = 1;
+            g_minigame_phase = pkt.minigame_phase;
+            g_minigame_type = pkt.minigame_type;
+            g_minigame_count = pkt.minigame_count;
+            memcpy(g_minigame_players,
+                pkt.minigame_players,
+                sizeof(int) * pkt.minigame_count);
+
+            SetCol(COL_SYSTEM);
+            printf("=================================\n");
+            printf("  SYSTEM RACE CONDITION DETECTED\n");
+            printf("=================================\n\n");
+            SetCol(COL_DEFAULT);
+
+            printf("미니게임 참가자:\n");
+            for (int i = 0; i < g_minigame_count; i++) {
+                int pid = g_minigame_players[i];
+                printf(" - P%d %s\n",
+                    pid + 1,
+                    pid == g_my_id ? "(YOU)" : "");
+            }
+            printf("\n");
+
+            // ---------- READY ----------
+            if (pkt.minigame_phase == 0) {
+                if (IsMinigameParticipant()) {
+                    SetCol(COL_SYSTEM);
+                    printf(">>> READY <<<\n");
+
+                    if (g_minigame_type == MG_MASH)
+                        printf("GO 신호 후 SPACE를 연타하세요\n");
+                    else
+                        printf("GO 신호에 맞춰 SPACE를 입력하세요\n");
+
+                    SetCol(COL_DEFAULT);
+                }
+                else {
+                    SetCol(COL_DIM);
+                    printf("[ 관전 중... ]\n");
+                    SetCol(COL_DEFAULT);
+                }
+                break;
+            }
+
+            // ---------- GO ----------
+            if (pkt.minigame_phase == 1) {
+
+                if (!IsMinigameParticipant()) {
+                    SetCol(COL_DIM);
+                    printf("[ 관전 중... ]\n");
+                    SetCol(COL_DEFAULT);
+                    break;
+                }
+
+                SetCol(COL_ACCENT);
+                printf("\n>>> GO! <<<\n");
+                SetCol(COL_DEFAULT);
+
+                FlushKeyBuffer();
+
+                // ===== 반응속도 =====
+                if (g_minigame_type == MG_REACTION) {
+
+                    int ch;
+                    while ((ch = _getch()) != ' ' && ch != '\r');
+
+                    GamePacket inp = { 0 };
+                    inp.type = PKT_MINIGAME_INPUT;
+                    send(sock, (char*)&inp, sizeof(inp), 0);
+                }
+
+                // ===== 연타 =====
+                else if (g_minigame_type == MG_MASH) {
+                    g_mashing = 1;
+                    g_mash_end_time = GetTickCount() + 3000;
+                }
+            }
+
+            break;
+        }
+
+        case PKT_MINIGAME_UPDATE:
+        {
+            if (pkt.minigame_type != MG_MASH)
+                break;
+
+            cls();
+            DrawBanner();
+
+            SetCol(COL_SYSTEM);
+            printf("=== MASHING... ===\n\n");
+            SetCol(COL_DEFAULT);
+
+            for (int i = 0; i < pkt.minigame_count; i++) {
+                int pid = pkt.minigame_players[i];
+                int score = pkt.positions[pid];
+
+                if (pid == g_my_id)
+                    SetCol(COL_ACCENT);
+                else
+                    SetCol(COL_DIM);
+
+                printf("P%d : %d\n", pid + 1, score);
+                SetCol(COL_DEFAULT);
+            }
+            break;
+        }
+
+        case PKT_MINIGAME_RESULT:
+        {
+            cls();
+            DrawBanner();
+
+            SetCol(COL_SYSTEM);
+            printf("=================================\n");
+            printf("  MINIGAME RESULT\n");
+            printf("=================================\n\n");
+            SetCol(COL_DEFAULT);
+
+            if (pkt.player_id == g_my_id) {
+                SetCol(COL_ACCENT);
+                printf(">>> YOU WON <<<\n\n");
+                PrintSystemMessage(pkt.message);
+            }
+            else if (IsMinigameParticipant()) {
+                SetCol(COL_WARN);
+                printf(">>> YOU LOST <<<\n");
+                printf("Winner : P%d\n\n", pkt.player_id + 1);
+                PrintSystemMessage(pkt.message);
+            }
+            else {
+                SetCol(COL_DIM);
+                printf("Winner : P%d (관전 중)\n", pkt.player_id + 1);
+            }
+
+            SetCol(COL_DEFAULT);
+
+            if (g_minigame_type == MG_REACTION)
+                printf("\nReaction Time : %d ms\n", pkt.value);
+            else if (g_minigame_type == MG_MASH)
+                printf("\nMash Count : %d\n", pkt.value);
+
+            Sleep(4000);
+            g_mashing = 0;
+            g_in_minigame = 0;
+            break;
+        }
 
         case PKT_GAME_OVER:
             if (pkt.map_size > 0)

@@ -14,22 +14,20 @@ void RollTwoDice(int* d1, int* d2, char* jokbo_out) {
     *d2 = (rand() % 6) + 1;
 
     // 간단 족보(원하는대로 늘려도 됨)
-    if (*d1 == *d2) {
-        // 더블
-        if (*d1 == 1) strcpy(jokbo_out, "[Snake Eyes 더블 1]");
-        else if (*d1 == 6) strcpy(jokbo_out, "[Boxcars 더블 6]");
-        else {
-            sprintf(jokbo_out, "[더블 %d]", *d1);
-        }
+    if (*d1 == *d2) {   // 더블
+        sprintf(jokbo_out, "[DOUBLE_%d]", *d1);
         return;
     }
 
     int sum = *d1 + *d2;
-    if (sum == 7) strcpy(jokbo_out, "[Lucky 7]");
-    else if (sum == 11) strcpy(jokbo_out, "[Eleven]");
-    else if (sum == 2) strcpy(jokbo_out, "[Craps 2]");
-    else if (sum == 12) strcpy(jokbo_out, "[Craps 12]");
-    else sprintf(jokbo_out, "[합 %d]", sum);
+    if (sum == 11)
+        strcpy(jokbo_out, "[ELEVATE_11]");
+    else if (sum == 2)
+        strcpy(jokbo_out, "[FAULT_02]");
+    else if (sum == 12)
+        strcpy(jokbo_out, "[OVERDRIVE]");
+    else
+        sprintf(jokbo_out, "[NORMAL_%02d]", sum);
 }
 
 void SortTurnOrder(int* turn_order, const int* order_rolls, int n) {
@@ -55,17 +53,17 @@ void SortTurnOrder(int* turn_order, const int* order_rolls, int n) {
     }
 }
 
-// 이벤트는 "칸 번호" 기반으로 간단히.
-// pos는 0..map_size 범위를 벗어나지 않도록 보정.
-// 반환 문자열은 서버에서 sprintf로 message에 붙여 쓰므로 짧게 유지.
+// 이벤트는 "칸 번호" 기반으로 간단히
+// pos는 0..map_size 범위를 벗어나지 않도록 보정
+// 반환 문자열은 서버에서 sprintf로 message에 붙여 쓰므로 짧게 유지
 const char* CheckMapEvent(int* pos, int map_size) {
     static const char* EVT_NONE = "";
-    static const char* EVT_BOOST = "(이벤트) 바람! +2칸";
-    static const char* EVT_TRAP = "(이벤트) 함정! -2칸";
-    static const char* EVT_WARP = "(이벤트) 포탈! 앞으로 순간이동";
-    static const char* EVT_SLIP = "(이벤트) 미끄럼! 뒤로 밀림";
-    static const char* EVT_LUCKY = "(이벤트) 행운! +1칸";
-    static const char* EVT_CURSE = "(이벤트) 불운! -1칸";
+    static const char* EVT_BOOST = "[ EVENT ] SYSTEM ACCELERATION +2 | 시스템 가속";
+    static const char* EVT_TRAP = "[ EVENT ] COMPUTE DELAY -2 | 연산 지연";
+    static const char* EVT_WARP = "[ EVENT ] PROXY OPTIMIZATION +3 ~ +5 | 프록시 최적화";
+    static const char* EVT_SLIP = "[ EVENT ] CRITICAL ERROR -2 ~ -4 | 치명적 오류";
+    static const char* EVT_LUCKY = "[ EVENT ] PACKET STABILIZATION +1 | 패킷 안정화";
+    static const char* EVT_CURSE = "[ EVENT ] DATA LOSS -1 | 데이터 손실";
 
     if (!pos) return EVT_NONE;
     if (map_size <= 0) return EVT_NONE;

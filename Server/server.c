@@ -13,18 +13,14 @@ static void BroadcastUpdate(SOCKET clients[], int positions[], int map_size) {
     st.map_size = map_size;
     memcpy(st.positions, positions, sizeof(int) * MAX_PLAYERS);
 
-    for (int j = 0; j < MAX_PLAYERS; j++) {
+    for (int j = 0; j < MAX_PLAYERS; j++)
         if (clients[j] != INVALID_SOCKET)
             send(clients[j], (char*)&st, sizeof(st), 0);
-    }
 }
 
 static void SendTurnPacket(
-    SOCKET clients[],
-    int current_player,
-    int positions[],
-    int map_size,
-    int turn_order[]
+    SOCKET clients[], int current_player,
+    int positions[], int map_size, int turn_order[]
 ) {
     GamePacket p = { 0 };
     p.type = PKT_YOUR_TURN;
@@ -37,12 +33,8 @@ static void SendTurnPacket(
 }
 
 static void SendWaitPacket(
-    SOCKET clients[],
-    int to_player,
-    int current_player,
-    int positions[],
-    int map_size,
-    int turn_order[]
+    SOCKET clients[], int to_player, int current_player,
+    int positions[], int map_size, int turn_order[]
 ) {
     GamePacket p = { 0 };
     p.type = PKT_WAIT;
@@ -52,6 +44,38 @@ static void SendWaitPacket(
     memcpy(p.turn_order, turn_order, sizeof(int) * MAX_PLAYERS);
 
     send(clients[to_player], (char*)&p, sizeof(p), 0);
+}
+
+// 이번 라운드 active 플레이어끼리만 동점 검사
+static int CheckDuplicateRollsMasked(
+    int rolls[], int active[], int need_reroll[], int n
+) {
+    int dup = 0;
+    memset(need_reroll, 0, sizeof(int) * n);
+
+    for (int i = 0; i < n; i++) {
+        if (!active[i]) continue;
+        for (int j = i + 1; j < n; j++) {
+            if (!active[j]) continue;
+            if (rolls[i] == rolls[j]) {
+                need_reroll[i] = 1;
+                need_reroll[j] = 1;
+                dup = 1;
+            }
+        }
+    }
+    return dup;
+}
+
+static void BroadcastGameStart(SOCKET clients[], int map_size, int turn_order[]) {
+    GamePacket p = { 0 };
+    p.type = PKT_GAME_START;
+    p.map_size = map_size;
+    memcpy(p.turn_order, turn_order, sizeof(int) * MAX_PLAYERS);
+
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        if (clients[i] != INVALID_SOCKET)
+            send(clients[i], (char*)&p, sizeof(p), 0);
 }
 
 // ------------------ main ------------------
@@ -79,14 +103,16 @@ int main() {
     for (int i = 0; i < MAX_PLAYERS; i++) clients[i] = INVALID_SOCKET;
 
     int positions[MAX_PLAYERS] = { 0 };
-    int order_rolls[MAX_PLAYERS] = { 0 };
-    int turn_order[MAX_PLAYERS] = { 0 };
-    int received_order[MAX_PLAYERS] = { 0 };
+
+    int order_rolls[MAX_PLAYERS];
+    int order_active[MAX_PLAYERS];
+    int order_received[MAX_PLAYERS];
+    int need_reroll[MAX_PLAYERS];
+    int turn_order[MAX_PLAYERS];
 
     int client_cnt = 0;
     int state = ST_WAIT;
-    int map_size = 30;
-    int order_cnt = 0;
+    int map_size = 100;
     int turn_idx = 0;
 
     srand((unsigned int)time(NULL));
@@ -101,7 +127,8 @@ int main() {
             if (clients[i] != INVALID_SOCKET)
                 FD_SET(clients[i], &rset);
 
-        if (select(0, &rset, NULL, NULL, NULL) == SOCKET_ERROR) break;
+        if (select(0, &rset, NULL, NULL, NULL) == SOCKET_ERROR)
+            break;
 
         // ---------- 접속 ----------
         if (FD_ISSET(listen_sock, &rset)) {
@@ -142,49 +169,139 @@ int main() {
                 continue;
             }
 
-            // MAP
+            // ---------- MAP ----------
             if (state == ST_MAP && i == 0 && pkt.type == PKT_MAP_REQ) {
-                map_size = pkt.map_size;
+
+                map_size = (pkt.map_size >= 50 && pkt.map_size <= 200)
+                    ? pkt.map_size : 100;
+
                 state = ST_ORDER;
 
-                order_cnt = 0;
-                memset(received_order, 0, sizeof(received_order));
+                // 순서 정하기 최초 라운드: 전원 active
+                for (int k = 0; k < MAX_PLAYERS; k++) {
+                    order_active[k] = 1;
+                    order_received[k] = 0;
+                    order_rolls[k] = -1;
+                }
 
                 GamePacket req = { 0 };
                 req.type = PKT_ORDER_REQ;
-                req.map_size = map_size;
+                strcpy(req.message,
+                    "[ ORDER SYNC ]\n"
+                    "SPACE를 입력하여 순서 결정");
 
                 for (int j = 0; j < MAX_PLAYERS; j++)
                     send(clients[j], (char*)&req, sizeof(req), 0);
             }
 
-            // ORDER
+            // ---------- ORDER ----------
             else if (state == ST_ORDER && pkt.type == PKT_ORDER_REQ) {
-                if (received_order[i]) continue;
-                received_order[i] = 1;
 
+                if (!order_active[i]) continue;
+                if (order_received[i]) continue;
+
+                order_received[i] = 1;
                 order_rolls[i] = (rand() % 12) + 1;
-                order_cnt++;
 
-                if (order_cnt == MAX_PLAYERS) {
-                    SortTurnOrder(turn_order, order_rolls, MAX_PLAYERS);
-                    state = ST_GAME;
-                    turn_idx = 0;
+                printf(">> P%d 순서 주사위: %d\n", i + 1, order_rolls[i]);
 
-                    BroadcastUpdate(clients, positions, map_size);
+                GamePacket res = { 0 };
+                res.type = PKT_ORDER_RESULT;
+                res.player_id = i;
+                res.dice1 = order_rolls[i];
+                sprintf(res.message,
+                    "[ ORDER ROLL ] P%d = %d",
+                    i + 1, order_rolls[i]);
 
-                    int current = turn_order[turn_idx];
-                    SendTurnPacket(clients, current, positions, map_size, turn_order);
+                for (int j = 0; j < MAX_PLAYERS; j++)
+                    send(clients[j], (char*)&res, sizeof(res), 0);
 
-                    for (int j = 0; j < MAX_PLAYERS; j++) {
-                        if (j == current) continue;
-                        SendWaitPacket(clients, j, current, positions, map_size, turn_order);
+                int active_cnt = 0, received_cnt = 0;
+                for (int k = 0; k < MAX_PLAYERS; k++) {
+                    if (order_active[k]) {
+                        active_cnt++;
+                        if (order_received[k]) received_cnt++;
                     }
                 }
+
+                if (received_cnt < active_cnt) continue;
+
+                // ----- 동점 검사 -----
+                if (CheckDuplicateRollsMasked(order_rolls, order_active, need_reroll, MAX_PLAYERS)) {
+
+                    // 메시지 생성
+                    char reroll_msg[128] = "[ REROLL REQUIRED ]\n재굴림 대상: ";
+
+                    int first = 1;
+                    for (int k = 0; k < MAX_PLAYERS; k++) {
+                        if (need_reroll[k]) {
+                            char tmp[16];
+                            sprintf(tmp, "%sP%d", first ? "" : ", ", k + 1);
+                            strcat(reroll_msg, tmp);
+                            first = 0;
+                        }
+                    }
+
+                    // 모두에게 재굴림 대상 리스트 공지
+                    GamePacket notice = { 0 };
+                    notice.type = PKT_ORDER_RESULT;
+                    notice.player_id = -1;
+                    strcpy(notice.message, reroll_msg);
+
+                    for (int j = 0; j < MAX_PLAYERS; j++)
+                        send(clients[j], (char*)&notice, sizeof(notice), 0);
+
+                    // 대상만 다시 굴리기
+                    for (int k = 0; k < MAX_PLAYERS; k++) {
+                        if (need_reroll[k]) {
+                            order_active[k] = 1;
+                            order_received[k] = 0;
+                            order_rolls[k] = -1;   // 재굴림 대상은 리셋
+                        }
+                        else {
+                            order_active[k] = 0;   // 비대상은 이번 라운드 비활성
+                        }
+                    }
+
+                    // 재굴림 대상에게만 입력 요청
+                    GamePacket req = { 0 };
+                    req.type = PKT_ORDER_REQ;
+                    strcpy(req.message,
+                        "[ REROLL INPUT REQUIRED ]\n"
+                        "당신은 재굴림 대상입니다\n"
+                        "SPACE 또는 ENTER를 입력하세요");
+
+                    for (int k = 0; k < MAX_PLAYERS; k++)
+                        if (order_active[k])
+                            send(clients[k], (char*)&req, sizeof(req), 0);
+
+                    continue;
+                }
+
+                // ----- 순서 확정 -----
+                SortTurnOrder(turn_order, order_rolls, MAX_PLAYERS);
+
+                state = ST_GAME;
+                turn_idx = 0;
+
+                // 게임 시작 패킷
+                BroadcastGameStart(clients, map_size, turn_order);
+
+                // 상태 동기화용 (위치 0)
+                BroadcastUpdate(clients, positions, map_size);
+
+                // 첫 턴
+                int cur = turn_order[turn_idx];
+                SendTurnPacket(clients, cur, positions, map_size, turn_order);
+
+                for (int j = 0; j < MAX_PLAYERS; j++)
+                    if (j != cur)
+                        SendWaitPacket(clients, j, cur, positions, map_size, turn_order);
             }
 
-            // GAME
+            // ---------- GAME ----------
             else if (state == ST_GAME) {
+
                 int current = turn_order[turn_idx];
                 if (i != current) continue;
                 if (pkt.type != PKT_YOUR_TURN) continue;
@@ -196,11 +313,8 @@ int main() {
                 positions[i] += (d1 + d2);
                 const char* evt = CheckMapEvent(&positions[i], map_size);
 
-                int win = 0;
-                if (positions[i] >= map_size) {
-                    positions[i] = map_size;
-                    win = 1;
-                }
+                int win = (positions[i] >= map_size);
+                if (win) positions[i] = map_size;
 
                 GamePacket res = { 0 };
                 res.type = win ? PKT_GAME_OVER : PKT_UPDATE;
@@ -213,19 +327,16 @@ int main() {
                 sprintf(res.message, "%s %s", jokbo, evt);
 
                 for (int j = 0; j < MAX_PLAYERS; j++)
-                    if (clients[j] != INVALID_SOCKET)
-                        send(clients[j], (char*)&res, sizeof(res), 0);
+                    send(clients[j], (char*)&res, sizeof(res), 0);
 
                 if (!win) {
                     turn_idx = (turn_idx + 1) % MAX_PLAYERS;
                     int next = turn_order[turn_idx];
 
                     SendTurnPacket(clients, next, positions, map_size, turn_order);
-
-                    for (int j = 0; j < MAX_PLAYERS; j++) {
-                        if (j == next) continue;
-                        SendWaitPacket(clients, j, next, positions, map_size, turn_order);
-                    }
+                    for (int j = 0; j < MAX_PLAYERS; j++)
+                        if (j != next)
+                            SendWaitPacket(clients, j, next, positions, map_size, turn_order);
                 }
             }
         }

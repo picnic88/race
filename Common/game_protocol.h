@@ -13,13 +13,14 @@
 
 #define PORT 9000          
 #define BUFSIZE 1024        
-#define MAX_PLAYERS 4      
+#define MAX_PLAYERS 4
 
 typedef enum {
     PKT_WAIT,
     PKT_MAP_REQ,
     PKT_ORDER_REQ,
     PKT_ORDER_RESULT,
+    PKT_GAME_START,
     PKT_YOUR_TURN,
     PKT_UPDATE,
     PKT_GAME_OVER,

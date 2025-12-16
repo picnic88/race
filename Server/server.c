@@ -244,7 +244,7 @@ int main() {
                 GamePacket r = { 0 };
                 r.type = PKT_MINIGAME_RESULT;
                 r.player_id = mg_winner;
-                r.value = mg_reaction[pid];
+                r.value = mg_score[pid];
 
                 if (mg_winner == -1) {
                     strcpy(r.message, "SYS:MASH_DRAW");

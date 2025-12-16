@@ -4,10 +4,10 @@
 #include <conio.h>
 #include <windows.h>
 
-#define TRACK_WIDTH 100   // ÄÜ¼Ö Æ®·¢ Æø °íÁ¤
+#define TRACK_WIDTH 100   // ì½˜ì†” íŠ¸ëž™ í­ ê³ ì •
 
-static int g_my_id = -1;        // ¼­¹ö°¡ ¹èÁ¤ÇØÁÖ´Â ³» ÇÃ·¹ÀÌ¾î ¹øÈ£(0~3)
-static int g_map_size = 0;      // ¼­¹ö¿¡¼­ ¹ÞÀº ½ÇÁ¦ ¸Ê Å©±â
+static int g_my_id = -1;        // ì„œë²„ê°€ ë°°ì •í•´ì£¼ëŠ” ë‚´ í”Œë ˆì´ì–´ ë²ˆí˜¸(0~3)
+static int g_map_size = 0;      // ì„œë²„ì—ì„œ ë°›ì€ ì‹¤ì œ ë§µ í¬ê¸°
 static int g_waiting_order_input = 0;
 static int g_order_rolls[MAX_PLAYERS] = { 0 };
 static int g_rerolling = 0;
@@ -26,23 +26,23 @@ static int g_mashing = 0;
 
 static void cls() { system("cls"); }
 
-typedef struct {    // ¼­¹ö ¸Þ½ÃÁö ¸ÅÇÎ
+typedef struct {    // ì„œë²„ ë©”ì‹œì§€ ë§¤í•‘
     const char* key;
     WORD color;
     const char* text;
 } SysMsg;
 
-// ---------------- ÄÜ¼Ö »ö»ó ----------------
+// ---------------- ì½˜ì†” ìƒ‰ìƒ ----------------
 
 static HANDLE g_hConsole;
 
 enum {
     COL_DEFAULT = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE,
-    COL_TITLE = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY, // ³×¿Â ½Ã¾È
-    COL_SYSTEM = FOREGROUND_GREEN | FOREGROUND_INTENSITY,                   // ³×¿Â ±×¸°
-    COL_WARN = FOREGROUND_RED | FOREGROUND_INTENSITY,                     // °æ°í ·¹µå
-    COL_ACCENT = FOREGROUND_BLUE | FOREGROUND_INTENSITY,                   // ºí·ç
-    COL_DIM = FOREGROUND_GREEN | FOREGROUND_BLUE                          // Èå¸° ½Ã¾È
+    COL_TITLE = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY, // ë„¤ì˜¨ ì‹œì•ˆ
+    COL_SYSTEM = FOREGROUND_GREEN | FOREGROUND_INTENSITY,                   // ë„¤ì˜¨ ê·¸ë¦°
+    COL_WARN = FOREGROUND_RED | FOREGROUND_INTENSITY,                     // ê²½ê³  ë ˆë“œ
+    COL_ACCENT = FOREGROUND_BLUE | FOREGROUND_INTENSITY,                   // ë¸”ë£¨
+    COL_DIM = FOREGROUND_GREEN | FOREGROUND_BLUE                          // íë¦° ì‹œì•ˆ
 };
 
 static void SetCol(WORD col) {
@@ -50,13 +50,13 @@ static void SetCol(WORD col) {
 }
 
 static SysMsg SYS_MSG_TABLE[] = {
-    { "SYS:ORDER_SYNC", COL_SYSTEM, "[ PROTOCOL SYNC ] ¼ø¼­ µ¿±âÈ­\nSPACE¸¦ ÀÔ·ÂÇÏ¿© ÁøÇà" },
-    { "SYS:REACTION_EARLY", COL_WARN, "[ INPUT VIOLATION ]\n½ÅÈ£ ÀÌÀü ÀÔ·Â °¨Áö\n0.4ÃÊ ÀÔ·Â Â÷´Ü" },
-    { "SYS:RACE_WON",   COL_ACCENT, "[ SYSTEM OVERRIDE ] ¿ì¼±±Ç È®º¸\nPROGRESS +2" },
-    { "SYS:RACE_LOST",  COL_WARN,   "[ LATENCY ERROR ] ¹ÝÀÀ Áö¿¬" },
-    { "SYS:MASH_WON",   COL_ACCENT, "[ SYSTEM OVERRIDE ] ¿ì¼±±Ç È®º¸\nPROGRESS +2" },
-    { "SYS:MASH_LOST",  COL_WARN,   "[ LATENCY ERROR ] ¹ÝÀÀ Áö¿¬" },
-    { "SYS:MASH_DRAW", COL_DIM, "[ SYSTEM NEUTRALIZED ]\n¹ÝÀÀ µ¿Á¡\nÈ¿°ú ¾øÀ½" },
+    { "SYS:ORDER_SYNC", COL_SYSTEM, "[ PROTOCOL SYNC ] ìˆœì„œ ë™ê¸°í™”\nSPACEë¥¼ ìž…ë ¥í•˜ì—¬ ì§„í–‰" },
+    { "SYS:REACTION_EARLY", COL_WARN, "[ INPUT VIOLATION ]\nì‹ í˜¸ ì´ì „ ìž…ë ¥ ê°ì§€\n0.4ì´ˆ ìž…ë ¥ ì°¨ë‹¨" },
+    { "SYS:RACE_WON",   COL_ACCENT, "[ SYSTEM OVERRIDE ] ìš°ì„ ê¶Œ í™•ë³´\nPROGRESS +2" },
+    { "SYS:RACE_LOST",  COL_WARN,   "[ LATENCY ERROR ] ë°˜ì‘ ì§€ì—°" },
+    { "SYS:MASH_WON",   COL_ACCENT, "[ SYSTEM OVERRIDE ] ìš°ì„ ê¶Œ í™•ë³´\nPROGRESS +2" },
+    { "SYS:MASH_LOST",  COL_WARN,   "[ LATENCY ERROR ] ë°˜ì‘ ì§€ì—°" },
+    { "SYS:MASH_DRAW", COL_DIM, "[ SYSTEM NEUTRALIZED ]\në°˜ì‘ ë™ì \níš¨ê³¼ ì—†ìŒ" },
 };
 
 // ---------------- UI ----------------
@@ -73,7 +73,7 @@ static void DrawBanner() {
 static void DrawTrack(int real_map_size, int positions[MAX_PLAYERS]) {
 
     if (real_map_size <= 0) {
-        printf("[TRACK] ¸Ê Á¤º¸ ¼ö½Å ´ë±â Áß...\n\n");
+        printf("[TRACK] ë§µ ì •ë³´ ìˆ˜ì‹  ëŒ€ê¸° ì¤‘...\n\n");
         return;
     }
 
@@ -81,7 +81,7 @@ static void DrawTrack(int real_map_size, int positions[MAX_PLAYERS]) {
 
     printf("[TRACK] 0");
     for (int i = 0; i < draw_width - 1; i++) printf("-");
-    printf("|%d\n", real_map_size);   // ½ÇÁ¦ ¸Ê Å©±â Ç¥½Ã
+    printf("|%d\n", real_map_size);   // ì‹¤ì œ ë§µ í¬ê¸° í‘œì‹œ
 
     for (int p = 0; p < MAX_PLAYERS; p++) {
 
@@ -89,7 +89,7 @@ static void DrawTrack(int real_map_size, int positions[MAX_PLAYERS]) {
         if (pos < 0) pos = 0;
         if (pos > real_map_size) pos = real_map_size;
 
-        // ½ÇÁ¦ À§Ä¡ ¡æ °íÁ¤ Æø À§Ä¡ ºñÀ² º¯È¯
+        // ì‹¤ì œ ìœ„ì¹˜ â†’ ê³ ì • í­ ìœ„ì¹˜ ë¹„ìœ¨ ë³€í™˜
         int draw_pos = (pos * draw_width) / real_map_size;
 
         if (draw_pos < 0) draw_pos = 0;
@@ -99,15 +99,15 @@ static void DrawTrack(int real_map_size, int positions[MAX_PLAYERS]) {
 
         for (int x = 0; x < draw_width; x++) {
             if (x == draw_pos) printf(">");
-            else printf(".");
+            else printf("_");
         }
-        printf("|\n");
+        printf("|\n\n");
     }
     printf("\n");
 }
 
 static void PrintPositions(int positions[MAX_PLAYERS]) {
-    printf("[ÇöÀç À§Ä¡]\n");
+    printf("[í˜„ìž¬ ìœ„ì¹˜]\n");
     for (int i = 0; i < MAX_PLAYERS; i++) {
         printf(" P%d: %d\n", i + 1, positions[i]);
     }
@@ -129,12 +129,12 @@ static int IsOrderComplete() {
 }
 
 static void DrawFinalTurnOrder() {
-    printf("[ÅÏ ¼ø¼­ È®Á¤]\n\n");
+    printf("[í„´ ìˆœì„œ í™•ì •]\n\n");
 
     for (int i = 0; i < MAX_PLAYERS; i++) {
         int pid = g_turn_order[i];
         if (pid >= 0) {
-            printf("%d¹ø: P%d %s\n",
+            printf("%dë²ˆ: P%d %s\n",
                 i + 1,
                 pid + 1,
                 pid == g_my_id ? "<- YOU" : "");
@@ -144,7 +144,7 @@ static void DrawFinalTurnOrder() {
     printf("\n");
 }
 
-// ¹Ì´Ï°ÔÀÓ Âü°¡ÀÚÀÎÁö ÆÇº°
+// ë¯¸ë‹ˆê²Œìž„ ì°¸ê°€ìžì¸ì§€ íŒë³„
 static int IsMinigameParticipant() {
     for (int i = 0; i < g_minigame_count; i++)
         if (g_minigame_players[i] == g_my_id)
@@ -176,7 +176,7 @@ int main() {
     g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-        printf("WSAStartup ½ÇÆÐ\n");
+        printf("WSAStartup ì‹¤íŒ¨\n");
         return 1;
     }
 
@@ -195,12 +195,12 @@ int main() {
     cls();
     SetCol(COL_DEFAULT);
     DrawBanner();
-    printf("¼­¹ö¿¡ Á¢¼ÓÇß½À´Ï´Ù.\n\n");
+    printf("ì„œë²„ì— ì ‘ì†í–ˆìŠµë‹ˆë‹¤.\n\n");
 
     int last_positions[MAX_PLAYERS] = { 0 };
 
     while (1) {
-        // ===== ¿¬Å¸ ¹Ì´Ï°ÔÀÓ ÀÔ·Â Ã³¸® (recv¿Í º´Çà) =====
+        // ===== ì—°íƒ€ ë¯¸ë‹ˆê²Œìž„ ìž…ë ¥ ì²˜ë¦¬ (recvì™€ ë³‘í–‰) =====
         if (g_mashing) {
 
             if (GetTickCount() > g_mash_end_time) {
@@ -219,7 +219,7 @@ int main() {
         GamePacket pkt;
         int ret = recv(sock, (char*)&pkt, sizeof(pkt), 0);
         if (ret <= 0) {
-            printf("¼­¹ö¿Í ¿¬°á Á¾·á\n");
+            printf("ì„œë²„ì™€ ì—°ê²° ì¢…ë£Œ\n");
             break;
         }
 
@@ -229,7 +229,7 @@ int main() {
         case PKT_ASSIGN_ID:
             g_my_id = pkt.player_id;
             SetCol(COL_ACCENT);
-            printf("´ç½ÅÀº %dPÀÔ´Ï´Ù.\n\n", g_my_id + 1);
+            printf("ë‹¹ì‹ ì€ %dPìž…ë‹ˆë‹¤.\n\n", g_my_id + 1);
             SetCol(COL_DEFAULT);
             break;
 
@@ -238,29 +238,29 @@ int main() {
             int size;
 
             while (1) {
-                printf("[¸Ê ¼³Á¤] ¸Ê Å©±â ÀÔ·Â (50 ~ 200): ");
+                printf("[ë§µ ì„¤ì •] ë§µ í¬ê¸° ìž…ë ¥ (50 ~ 200): ");
 
-                // ¹®ÀÚ¿­·Î ÇÑ ÁÙ ÀÔ·Â
+                // ë¬¸ìžì—´ë¡œ í•œ ì¤„ ìž…ë ¥
                 if (!fgets(buf, sizeof(buf), stdin)) {
                     continue;
                 }
 
-                // °³Çà Á¦°Å
+                // ê°œí–‰ ì œê±°
                 buf[strcspn(buf, "\n")] = 0;
 
-                // ¼ýÀÚ·Î º¯È¯
+                // ìˆ«ìžë¡œ ë³€í™˜
                 char* end;
                 size = (int)strtol(buf, &end, 10);
 
-                // ¼ýÀÚ°¡ ¾Æ´Ñ ÀÔ·Â Ã³¸®
+                // ìˆ«ìžê°€ ì•„ë‹Œ ìž…ë ¥ ì²˜ë¦¬
                 if (end == buf || *end != '\0') {
-                    printf("¼ýÀÚ¸¸ ÀÔ·ÂÇØ ÁÖ¼¼¿ä.\n\n");
+                    printf("ìˆ«ìžë§Œ ìž…ë ¥í•´ ì£¼ì„¸ìš”.\n\n");
                     continue;
                 }
 
-                // ¹üÀ§ °Ë»ç
+                // ë²”ìœ„ ê²€ì‚¬
                 if (size < 50 || size > 200) {
-                    printf("50 ~ 200 »çÀÌÀÇ °ªÀ» ÀÔ·ÂÇØ ÁÖ¼¼¿ä.\n\n");
+                    printf("50 ~ 200 ì‚¬ì´ì˜ ê°’ì„ ìž…ë ¥í•´ ì£¼ì„¸ìš”.\n\n");
                     continue;
                 }
 
@@ -286,12 +286,12 @@ int main() {
             DrawBanner();
 
             if (pkt.message[0] != '\0') {
-                // ¼­¹ö°¡ º¸³½ ¸Þ½ÃÁö°¡ ÀÖÀ¸¸é ±×°Í¸¸ »ç¿ë
+                // ì„œë²„ê°€ ë³´ë‚¸ ë©”ì‹œì§€ê°€ ìžˆìœ¼ë©´ ê·¸ê²ƒë§Œ ì‚¬ìš©
                 PrintSystemMessage(pkt.message);
             }
             else {
-                // ¼­¹ö ¸Þ½ÃÁö°¡ ¾øÀ» ¶§¸¸ ±âº» ¹®±¸ Ãâ·Â
-                printf("½ºÆäÀÌ½º¹Ù ¶Ç´Â Enter¸¦ ´­·¯ ÁøÇà\n");
+                // ì„œë²„ ë©”ì‹œì§€ê°€ ì—†ì„ ë•Œë§Œ ê¸°ë³¸ ë¬¸êµ¬ ì¶œë ¥
+                printf("ìŠ¤íŽ˜ì´ìŠ¤ë°” ë˜ëŠ” Enterë¥¼ ëˆŒëŸ¬ ì§„í–‰\n");
             }
 
             int ch;
@@ -308,54 +308,54 @@ int main() {
 
         case PKT_ORDER_RESULT:
         {
-            // ½Ã½ºÅÛ ¸Þ½ÃÁö (µ¿Á¡ ¾È³»)
+            // ì‹œìŠ¤í…œ ë©”ì‹œì§€ (ë™ì  ì•ˆë‚´)
             if (pkt.player_id == -1) {
                 cls();
                 SetCol(COL_DEFAULT);
                 DrawBanner();
 
-                printf("[¾È³»]\n%s\n\n", pkt.message);
+                printf("[ì•ˆë‚´]\n%s\n\n", pkt.message);
 
-                // Àç±¼¸² ´Ü°è ÁøÀÔ
+                // ìž¬êµ´ë¦¼ ë‹¨ê³„ ì§„ìž…
                 g_rerolling = 1;
                 break;
             }
 
-            // ÇÃ·¹ÀÌ¾î ÁÖ»çÀ§ °á°ú ¼ö½Å
+            // í”Œë ˆì´ì–´ ì£¼ì‚¬ìœ„ ê²°ê³¼ ìˆ˜ì‹ 
             if (pkt.player_id >= 0 && pkt.player_id < MAX_PLAYERS) {
                 g_order_rolls[pkt.player_id] = pkt.dice1;
 
-                // ³» °á°ú¸é ÀÔ·Â ´ë±â ÇØÁ¦
+                // ë‚´ ê²°ê³¼ë©´ ìž…ë ¥ ëŒ€ê¸° í•´ì œ
                 if (pkt.player_id == g_my_id) {
                     g_waiting_order_input = 0;
                 }
             }
 
-            // È­¸é Ãâ·Â
+            // í™”ë©´ ì¶œë ¥
             cls();
             SetCol(COL_DEFAULT);
             DrawBanner();
-            printf("[¼ø¼­ ÁÖ»çÀ§ °á°ú]\n\n");
+            printf("[ìˆœì„œ ì£¼ì‚¬ìœ„ ê²°ê³¼]\n\n");
 
             for (int p = 0; p < MAX_PLAYERS; p++) {
                 if (g_order_rolls[p] > 0)
                     printf("P%d : %d\n", p + 1, g_order_rolls[p]);
                 else
-                    printf("P%d : (µ¿±âÈ­ ´ë»ó)\n", p + 1);
+                    printf("P%d : (ë™ê¸°í™” ëŒ€ìƒ)\n", p + 1);
             }
 
             printf("\n");
 
-            // ¸ðµç °ª È®Á¤µÇ¾úÀ¸¸é ¸¶¹«¸®
+            // ëª¨ë“  ê°’ í™•ì •ë˜ì—ˆìœ¼ë©´ ë§ˆë¬´ë¦¬
             if (IsOrderComplete()) {
-                g_rerolling = 0;  // Àç±¼¸² Á¾·á
+                g_rerolling = 0;  // ìž¬êµ´ë¦¼ ì¢…ë£Œ
 
                 printf("---------------------------------\n");
-                printf("¼ø¼­°¡ È®Á¤µÇ¾ú½À´Ï´Ù.\n\n");
+                printf("ìˆœì„œê°€ í™•ì •ë˜ì—ˆìŠµë‹ˆë‹¤.\n\n");
 
                 DrawFinalTurnOrder();
 
-                printf("Àá½Ã ÈÄ °ÔÀÓÀÌ ½ÃÀÛµË´Ï´Ù...\n");
+                printf("ìž ì‹œ í›„ ê²Œìž„ì´ ì‹œìž‘ë©ë‹ˆë‹¤...\n");
                 printf("---------------------------------\n");
 
                 Sleep(2000);
@@ -375,11 +375,11 @@ int main() {
             SetCol(COL_DIM);
             printf("---------------------------------\n");
             printf(" SYSTEM BOOTING...\n");
-            printf(" ½Ã½ºÅÛ ÃÊ±âÈ­ Áß...\n\n");
+            printf(" ì‹œìŠ¤í…œ ì´ˆê¸°í™” ì¤‘...\n\n");
 
             SetCol(COL_SYSTEM);
             printf(" GAME PROTOCOL START\n");
-            printf(" °ÔÀÓÀ» ½ÃÀÛÇÕ´Ï´Ù\n");
+            printf(" ê²Œìž„ì„ ì‹œìž‘í•©ë‹ˆë‹¤\n");
 
             SetCol(COL_DIM);
             printf("---------------------------------\n");
@@ -404,7 +404,7 @@ int main() {
                 break;
             }
 
-            // ÁÖ»çÀ§ °á°ú
+            // ì£¼ì‚¬ìœ„ ê²°ê³¼
             printf("[ EXECUTION LOG ]\n\n");
             printf(" DICE   : %d + %d\n", pkt.dice1, pkt.dice2);
             SetCol(COL_ACCENT);
@@ -420,15 +420,15 @@ int main() {
                 if (strstr(pkt.message, "ACCELERATION") ||
                     strstr(pkt.message, "OPTIMIZATION") ||
                     strstr(pkt.message, "STABILIZATION")) {
-                    SetCol(COL_SYSTEM);   // ¹öÇÁ
+                    SetCol(COL_SYSTEM);   // ë²„í”„
                 }
                 else if (strstr(pkt.message, "DELAY") ||
                     strstr(pkt.message, "ERROR") ||
                     strstr(pkt.message, "LOSS")) {
-                    SetCol(COL_WARN);     // µð¹öÇÁ
+                    SetCol(COL_WARN);     // ë””ë²„í”„
                 }
                 else {
-                    SetCol(COL_DIM);      // Áß¸³
+                    SetCol(COL_DIM);      // ì¤‘ë¦½
                 }
 
                 printf(" EVENT  : %s\n\n", pkt.message);
@@ -440,7 +440,7 @@ int main() {
             DrawTrack(g_map_size, last_positions);
             PrintPositions(last_positions);
 
-            g_showing_result = 1;   // °á°ú Ç¥½Ã Áß
+            g_showing_result = 1;   // ê²°ê³¼ í‘œì‹œ ì¤‘
             break;
 
         case PKT_YOUR_TURN:
@@ -450,17 +450,17 @@ int main() {
             memcpy(last_positions, pkt.positions, sizeof(last_positions));
             memcpy(g_turn_order, pkt.turn_order, sizeof(g_turn_order));
 
-            // Á÷Àü¿¡ °á°ú È­¸éÀÌ ¶°ÀÖÀ¸¸é ±×´ë·Î À§¿¡ ÅÏ ¹®±¸¸¸ ÀÌ¾î ºÙÀÌ±â
+            // ì§ì „ì— ê²°ê³¼ í™”ë©´ì´ ë– ìžˆìœ¼ë©´ ê·¸ëŒ€ë¡œ ìœ„ì— í„´ ë¬¸êµ¬ë§Œ ì´ì–´ ë¶™ì´ê¸°
             if (g_showing_result) {
                 printf("=================================\n");
                 SetCol(COL_ACCENT);
                 printf(" >>> CONTROL GRANTED <<<\n");
                 SetCol(COL_DEFAULT);
-                printf(" ´ç½ÅÀÇ ÅÏÀÔ´Ï´Ù\n\n");
+                printf(" ë‹¹ì‹ ì˜ í„´ìž…ë‹ˆë‹¤\n\n");
                 SetCol(COL_SYSTEM);
                 printf(" [ SPACE ] EXECUTE ROLL\n");
                 SetCol(COL_DEFAULT);
-                printf(" SPACE¸¦ ÀÔ·ÂÇÏ¿© ÁøÇàÇÏ½Ê½Ã¿À\n");
+                printf(" SPACEë¥¼ ìž…ë ¥í•˜ì—¬ ì§„í–‰í•˜ì‹­ì‹œì˜¤\n");
                 printf("=================================\n");
             }
             else {
@@ -474,15 +474,15 @@ int main() {
                 SetCol(COL_ACCENT);
                 printf(" >>> CONTROL GRANTED <<<\n");
                 SetCol(COL_DEFAULT);
-                printf(" ´ç½ÅÀÇ ÅÏÀÔ´Ï´Ù\n\n");
+                printf(" ë‹¹ì‹ ì˜ í„´ìž…ë‹ˆë‹¤\n\n");
                 SetCol(COL_SYSTEM);
                 printf(" [ SPACE ] EXECUTE ROLL\n");
                 SetCol(COL_DEFAULT);
-                printf(" SPACE¸¦ ÀÔ·ÂÇÏ¿© ÁøÇàÇÏ½Ê½Ã¿À\n");
+                printf(" SPACEë¥¼ ìž…ë ¥í•˜ì—¬ ì§„í–‰í•˜ì‹­ì‹œì˜¤\n");
                 printf("=================================\n");
             }
 
-            // ¿©±â¼­ °á°ú È­¸é Àá±Ý ÇØÁ¦ (´ÙÀ½ºÎÅÍ Á¤»ó ·»´õ¸µ)
+            // ì—¬ê¸°ì„œ ê²°ê³¼ í™”ë©´ ìž ê¸ˆ í•´ì œ (ë‹¤ìŒë¶€í„° ì •ìƒ ë Œë”ë§)
             g_showing_result = 0;
 
             while ((ch = _getch()) != ' ' && ch != '\r');
@@ -499,12 +499,12 @@ int main() {
             memcpy(last_positions, pkt.positions, sizeof(last_positions));
             memcpy(g_turn_order, pkt.turn_order, sizeof(g_turn_order));
 
-            // ¹æ±Ý °á°ú È­¸éÀÌ ¶°ÀÖÀ¸¸é(UPDATE Á÷ÈÄ) µ¤¾î¾²Áö ¸»°í ¾È³»¸¸ Ãß°¡
+            // ë°©ê¸ˆ ê²°ê³¼ í™”ë©´ì´ ë– ìžˆìœ¼ë©´(UPDATE ì§í›„) ë®ì–´ì“°ì§€ ë§ê³  ì•ˆë‚´ë§Œ ì¶”ê°€
             if (g_showing_result) {
                 SetCol(COL_DIM);
                 printf("---------------------------------\n");
                 printf(" PLAYER P%d EXECUTING...\n", pkt.player_id + 1);
-                printf(" %dP°¡ Çàµ¿ ÁßÀÔ´Ï´Ù...\n", pkt.player_id + 1);
+                printf(" %dPê°€ í–‰ë™ ì¤‘ìž…ë‹ˆë‹¤...\n", pkt.player_id + 1);
                 printf("---------------------------------\n");
                 SetCol(COL_DEFAULT);
 
@@ -512,7 +512,7 @@ int main() {
                 break;
             }
 
-            // °á°ú È­¸éÀÌ ¾Æ´Ï¸é Á¤»óÀûÀ¸·Î È­¸é ·»´õ
+            // ê²°ê³¼ í™”ë©´ì´ ì•„ë‹ˆë©´ ì •ìƒì ìœ¼ë¡œ í™”ë©´ ë Œë”
             cls();
             SetCol(COL_DEFAULT);
             DrawBanner();
@@ -524,11 +524,11 @@ int main() {
 
             if (g_just_started) {
                 printf(" SYSTEM SYNC IN PROGRESS...\n");
-                printf(" ÃÊ±â µ¿±âÈ­ Áß...\n");
+                printf(" ì´ˆê¸° ë™ê¸°í™” ì¤‘...\n");
             }
             else {
                 printf(" PLAYER P%d EXECUTING...\n", pkt.player_id + 1);
-                printf(" %dP°¡ Çàµ¿ ÁßÀÔ´Ï´Ù...\n", pkt.player_id + 1);
+                printf(" %dPê°€ í–‰ë™ ì¤‘ìž…ë‹ˆë‹¤...\n", pkt.player_id + 1);
             }
 
             printf("---------------------------------\n");
@@ -537,7 +537,7 @@ int main() {
             g_just_started = 0;
             break;
 
-            // ---------- ¹Ì´Ï°ÔÀÓ ----------
+            // ---------- ë¯¸ë‹ˆê²Œìž„ ----------
         case PKT_MINIGAME_START:
         {
             cls();
@@ -558,7 +558,7 @@ int main() {
             printf("=================================\n\n");
             SetCol(COL_DEFAULT);
 
-            printf("¹Ì´Ï°ÔÀÓ Âü°¡ÀÚ:\n");
+            printf("ë¯¸ë‹ˆê²Œìž„ ì°¸ê°€ìž:\n");
             for (int i = 0; i < g_minigame_count; i++) {
                 int pid = g_minigame_players[i];
                 printf(" - P%d %s\n",
@@ -574,15 +574,15 @@ int main() {
                     printf(">>> READY <<<\n");
 
                     if (g_minigame_type == MG_MASH)
-                        printf("GO ½ÅÈ£ ÈÄ SPACE¸¦ ¿¬Å¸ÇÏ¼¼¿ä\n");
+                        printf("GO ì‹ í˜¸ í›„ SPACEë¥¼ ì—°íƒ€í•˜ì„¸ìš”\n");
                     else
-                        printf("Àá½Ã ÈÄ GO ½ÅÈ£¿¡ ¸ÂÃç SPACE¸¦ ÀÔ·ÂÇÏ¼¼¿ä\n");
+                        printf("ìž ì‹œ í›„ GO ì‹ í˜¸ì— ë§žì¶° SPACEë¥¼ ìž…ë ¥í•˜ì„¸ìš”\n");
 
                     SetCol(COL_DEFAULT);
                 }
                 else {
                     SetCol(COL_DIM);
-                    printf("[ °üÀü Áß... ]\n");
+                    printf("[ ê´€ì „ ì¤‘... ]\n");
                     SetCol(COL_DEFAULT);
                 }
                 break;
@@ -593,7 +593,7 @@ int main() {
 
                 if (!IsMinigameParticipant()) {
                     SetCol(COL_DIM);
-                    printf("[ °üÀü Áß... ]\n");
+                    printf("[ ê´€ì „ ì¤‘... ]\n");
                     SetCol(COL_DEFAULT);
                     break;
                 }
@@ -604,7 +604,7 @@ int main() {
 
                 FlushKeyBuffer();
 
-                // ===== ¹ÝÀÀ¼Óµµ =====
+                // ===== ë°˜ì‘ì†ë„ =====
                 if (g_minigame_type == MG_REACTION) {
 
                     int ch;
@@ -615,7 +615,7 @@ int main() {
                     send(sock, (char*)&inp, sizeof(inp), 0);
                 }
 
-                // ===== ¿¬Å¸ =====
+                // ===== ì—°íƒ€ =====
                 else if (g_minigame_type == MG_MASH) {
                     g_mashing = 1;
                     g_mash_end_time = GetTickCount() + 3000;
@@ -682,7 +682,7 @@ int main() {
             else {
                 SetCol(COL_DIM);
                 printf("Winner : P%d\n", pkt.player_id + 1);
-                printf("(°üÀü Áß)\n");
+                printf("(ê´€ì „ ì¤‘)\n");
             }
 
             SetCol(COL_DEFAULT);
@@ -708,24 +708,24 @@ int main() {
             SetCol(COL_SYSTEM);
             printf("=================================\n");
             printf(" SYSTEM OVERRIDE COMPLETE\n");
-            printf(" ½Ã½ºÅÛ Àå¾Ç ¿Ï·á\n");
+            printf(" ì‹œìŠ¤í…œ ìž¥ì•… ì™„ë£Œ\n");
             printf("=================================\n\n");
             SetCol(COL_ACCENT);
             printf(" WINNER : P%d\n", pkt.player_id + 1);
-            printf(" ÃÖÁ¾ ½ÂÀÚ : P%d\n\n", pkt.player_id + 1);
+            printf(" ìµœì¢… ìŠ¹ìž : P%d\n\n", pkt.player_id + 1);
             SetCol(COL_DEFAULT);
 
             DrawTrack(g_map_size, pkt.positions);
             PrintPositions(pkt.positions);
 
-            printf("¾Æ¹« Å°³ª ´©¸£¸é Á¾·áÇÕ´Ï´Ù.\n");
+            printf("ì•„ë¬´ í‚¤ë‚˜ ëˆ„ë¥´ë©´ ì¢…ë£Œí•©ë‹ˆë‹¤.\n");
             while ((ch = _getch()) != ' ' && ch != '\r');
             closesocket(sock);
             WSACleanup();
             return 0;
 
         default:
-            printf("¾Ë ¼ö ¾ø´Â ÆÐÅ¶ ¼ö½Å: %d\n", pkt.type);
+            printf("ì•Œ ìˆ˜ ì—†ëŠ” íŒ¨í‚· ìˆ˜ì‹ : %d\n", pkt.type);
             break;
         }
     }
